@@ -98,7 +98,7 @@ def process_log_data(spark, input_data, output_data):
     songplay_table = songplay_table.withColumn('songplay_id', monotonically_increasing_id())
 
     # write songplays table to parquet files
-    songplay_table.write.partitionBy('year', 'artist_id').parquet(output_data + 'songplay/')
+    songplay_table.write.partitionBy('year', 'month').parquet(output_data + 'songplay/')
 
 
 def main():
