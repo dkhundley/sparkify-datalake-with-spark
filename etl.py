@@ -32,11 +32,17 @@ def process_song_data(spark, input_data, output_data):
     # extract columns to create songs table
     songs_table = song_df['song_id', 'title', 'artist_id', 'year', 'duration']
 
+    # Dropping duplicates from the songs_table
+    songs_table = songs_table.drop_duplicates(subset=['song_id'])
+
     # write songs table to parquet files partitioned by year and artist
     songs_table.write.partitionBy('year', 'artist_id').parquet(output_data + 'songs/')
 
     # extract columns to create artists table
     artists_table = song_df['artist_id', 'artist_name', 'artist_location', 'artist_latitude', 'artist_longitude']
+
+    # Dropping duplicates from the artists_table
+    artists_table = artists_table.drop_duplicates(subset=['artist_id'])
 
     # write artists table to parquet files
     artists_table.write.parquet(output_data + 'artists/')
@@ -49,8 +55,14 @@ def process_log_data(spark, input_data, output_data):
     # read log data file
     log_df = spark.read.json(log_data)
 
+    # Filtering by 'Next Song' action
+    log_df = log_df.filter(log_df['page'] == 'NextSong')
+
     # extract columns for users table
     users_table = log_df['userId', 'firstName', 'lastName', 'gender', 'level']
+
+    # Dropping duplicates from the users_table
+    users_table = users_table.drop_duplicates(subset=['userId'])
 
     # write users table to parquet files
     users_table.write.parquet(output_data + 'users/')
@@ -60,6 +72,9 @@ def process_log_data(spark, input_data, output_data):
 
     # Creating new 'start_date' column using UDF defined above
     log_df = log_df.withColumn('start_date', get_datetime(log_df.ts))
+
+    # Adding month to log_df for later use
+    log_df = log_df.withColumn('month', month(log_df.start_date))
 
     # extract columns to create time table
     time_table = log_df.select('start_date',
@@ -79,11 +94,11 @@ def process_log_data(spark, input_data, output_data):
     log_df = log_df.join(songs_table_df, (log_df.song == songs_table_df.title))
 
     # extract columns from joined song and log datasets to create songplays table
-    songplay_table = log_df['start_date', 'userId', 'level', 'song_id', 'artist_id', 'location', 'userAgent']
+    songplay_table = log_df['start_date', 'userId', 'level', 'song_id', 'artist_id', 'location', 'userAgent', 'year', 'month']
     songplay_table = songplay_table.withColumn('songplay_id', monotonically_increasing_id())
 
     # write songplays table to parquet files
-    songplay_table.write.parquet(output_data + 'songplay/')
+    songplay_table.write.partitionBy('year', 'artist_id').parquet(output_data + 'songplay/')
 
 
 def main():
